@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>الالتزام بالحمية الغذائية</title>
+
+<!-- ===== PWA ===== -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#22c55e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="الحمية">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+  :root{
+    --green:#22c55e; --red:#ef4444; --blue:#0ea5e9; --amber:#f59e0b;
+    --violet:#8b5cf6; --teal:#0d9488; --pink:#ec4899; --bg:#f1f5f9; --card:#ffffff;
+    --text:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  }
+  *{box-sizing:border-box}
+  html,body{overscroll-behavior-y:contain}
+  body{
+    margin:0; font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+    background:var(--bg); color:var(--text); direction:rtl;
+    padding-bottom:100px;
+    -webkit-tap-highlight-color:transparent;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    background:linear-gradient(135deg,#0ea5e9,#22c55e);
+    color:#fff; padding:calc(26px + env(safe-area-inset-top)) 18px 26px;
+    text-align:center; box-shadow:0 6px 18px rgba(15,23,42,.12);
+  }
+  header h1{margin:0; font-size:24px; letter-spacing:.3px}
+  header p{margin:8px 0 0; opacity:.92; font-size:14px}
+  .wrap{max-width:1020px; margin:0 auto; padding:18px}
+  .card{
+    background:var(--card); border-radius:16px; padding:18px;
+    margin-bottom:18px; box-shadow:0 2px 12px rgba(15,23,42,.06);
+  }
+  .card h2{margin:0 0 14px; font-size:18px; display:flex; align-items:center; gap:8px}
+  .card h2 small{font-size:12px; color:var(--muted); font-weight:400}
+
+  /* ===== الإحصائيات السريعة ===== */
+  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:18px}
+  .stat{
+    background:#fff; border-radius:14px; padding:14px; text-align:center;
+    box-shadow:0 2px 12px rgba(15,23,42,.06); border-top:4px solid var(--blue);
+  }
+  .stat .val{font-size:22px; font-weight:700; color:var(--blue)}
+  .stat .lbl{font-size:12px; color:var(--muted); margin-top:4px}
+  .stat.g{border-top-color:var(--green)} .stat.g .val{color:var(--green)}
+  .stat.a{border-top-color:var(--amber)} .stat.a .val{color:var(--amber)}
+
+  /* ===== النموذج ===== */
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px}
+  .field label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px; font-weight:600}
+  input[type="date"], input[type="number"]{
+    width:100%; padding:10px 12px; border:2px solid var(--line);
+    border-radius:10px; font-family:inherit; font-size:14px; background:#fff; color:var(--text);
+  }
+  input[type="date"]:focus, input[type="number"]:focus{outline:none; border-color:var(--blue)}
+
+  .range-row{display:flex; align-items:center; gap:12px}
+  input[type="range"]{
+    flex:1; accent-color:var(--green); height:6px; cursor:pointer; min-width:0;
+  }
+  output{
+    min-width:78px; text-align:center; font-weight:700; font-size:13px;
+    border-radius:8px; padding:6px 4px; background:#f8fafc; color:var(--muted);
+  }
+
+  /* ===== معايير النسب المئوية ===== */
+  .criteria{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px}
+  .crit-item{
+    --accent:var(--blue);
+    background:#fff; border:2px solid var(--line); border-right:5px solid var(--accent);
+    border-radius:12px; padding:12px 14px; transition:.18s;
+  }
+  .crit-item:hover{box-shadow:0 2px 10px rgba(15,23,42,.07)}
+  .crit-item.wide{grid-column:1 / -1}
+  .crit-head{
+    display:flex; align-items:center; gap:8px; font-size:14px;
+    font-weight:600; margin-bottom:10px;
+  }
+  .crit-head .dot{width:10px; height:10px; border-radius:50%; background:var(--accent); flex:0 0 auto}
+  .crit-item input[type="range"]{accent-color:var(--accent)}
+  .crit-item output{color:var(--accent); background:#f8fafc}
+  .target-box{
+    display:flex; align-items:center; gap:8px; margin-top:10px;
+    font-size:12px; color:var(--muted); font-weight:600;
+  }
+  .target-box input{width:90px; padding:6px 8px; font-size:13px}
+
+  /* ===== شريط النتيجة الحية ===== */
+  .live-score{
+    display:flex; align-items:center; justify-content:space-between;
+    background:#f8fafc; border:2px dashed var(--line); border-radius:12px;
+    padding:12px 16px; font-size:14px; font-weight:600; color:var(--muted);
+    margin-bottom:16px; flex-wrap:wrap; gap:8px;
+  }
+  .live-score strong{font-size:24px; color:var(--blue)}
+
+  .actions{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  button{
+    font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;
+    border:none; border-radius:10px; padding:11px 20px; transition:.18s;
+  }
+  .btn-main{background:var(--green); color:#fff}
+  .btn-main:hover{background:#16a34a}
+  .btn-danger{background:#fee2e2; color:#b91c1c; display:none}
+  .btn-danger:hover{background:#fecaca}
+  .msg{margin-right:auto; font-size:13px; font-weight:600; color:var(--green)}
+  .msg.warn{color:var(--amber)}
+
+  /* ===== الرسم البياني ===== */
+  .chart-box{position:relative; height:380px}
+
+  /* ===== التقرير ===== */
+  .presets{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px}
+  .presets button{background:#f1f5f9; color:#334155; padding:8px 14px; font-size:13px}
+  .presets button:hover{background:#e2e8f0}
+  .presets button.active{background:var(--blue); color:#fff}
+
+  .report-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:16px 0}
+  .r-item{
+    background:#f8fafc; border-radius:12px; padding:12px; text-align:center;
+    border:1px solid var(--line);
+  }
+  .r-item .v{font-size:19px; font-weight:700; color:var(--text)}
+  .r-item .l{font-size:12px; color:var(--muted); margin-top:4px}
+
+  .rating{
+    text-align:center; padding:14px; border-radius:12px; font-weight:700;
+    font-size:16px; margin-top:6px;
+  }
+
+  table{width:100%; border-collapse:collapse; font-size:13px; margin-top:14px}
+  thead th{
+    background:#f1f5f9; padding:10px 8px; text-align:center;
+    font-size:12px; color:var(--muted); font-weight:700; position:sticky; top:0;
+  }
+  tbody td{padding:9px 8px; text-align:center; border-top:1px solid var(--line)}
+  tbody tr:hover{background:#f8fafc}
+  .tbl-scroll{max-height:380px; overflow:auto; border-radius:12px; border:1px solid var(--line)}
+  .empty{text-align:center; color:var(--muted); padding:26px; font-size:14px}
+  .sub{display:block; font-size:10px; font-weight:600; opacity:.75}
+
+  /* ===== زر التثبيت ===== */
+  .install-btn{
+    position:fixed;
+    bottom:calc(20px + env(safe-area-inset-bottom));
+    left:50%; transform:translateX(-50%);
+    background:linear-gradient(135deg,#0ea5e9,#22c55e);
+    color:#fff; border:none; padding:14px 28px; border-radius:30px;
+    font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;
+    box-shadow:0 6px 24px rgba(34,197,94,.45);
+    z-index:9999; display:none;
+    animation:pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{box-shadow:0 6px 24px rgba(34,197,94,.45)}
+    50%{box-shadow:0 6px 30px rgba(34,197,94,.8)}
+  }
+  .install-btn.show{display:block}
+  .install-btn:active{transform:translateX(-50%) scale(.97)}
+
+  @media(max-width:640px){
+    .row{grid-template-columns:1fr}
+    .criteria{grid-template-columns:1fr}
+    .stats{grid-template-columns:1fr}
+    .chart-box{height:320px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🥗 الالتزام بالحمية الغذائية</h1>
+  <p>سجّل نسب التزامك اليومي — يعمل بدون إنترنت ويخزن على هاتفك</p>
+</header>
+
+<div class="wrap">
+
+  <!-- الإحصائيات السريعة -->
+  <div class="stats">
+    <div class="stat">
+      <div class="val" id="statToday">—</div>
+      <div class="lbl">التزام اليوم</div>
+    </div>
+    <div class="stat g">
+      <div class="val" id="statWeek">—</div>
+      <div class="lbl">متوسط آخر 7 أيام</div>
+    </div>
+    <div class="stat a">
+      <div class="val" id="statStreak">—</div>
+      <div class="lbl">أيام متتالية (≥ 75%)</div>
+    </div>
+  </div>
+
+  <!-- التسجيل اليومي -->
+  <section class="card">
+    <h2>📝 التسجيل اليومي <small>— المعايير الأربعة الأولى بنسبة مئوية، والمشي والصيام بالساعات/الدقائق</small></h2>
+
+    <div class="row">
+      <div class="field">
+        <label for="dateInput">التاريخ</label>
+        <input type="date" id="dateInput">
+      </div>
+      <div class="field">
+        <label>نسبة الالتزام المحسوبة</label>
+        <div id="formScore" style="background:#f8fafc; border:2px solid var(--line);
+             border-radius:10px; padding:10px 12px; text-align:center; font-weight:700; color:var(--blue)">
+          0%
+        </div>
+      </div>
+    </div>
+
+    <div class="criteria">
+      <div class="crit-item" style="--accent:#f59e0b">
+        <div class="crit-head"><span class="dot"></span><span>الامتناع عن أكل الخبز</span></div>
+        <div class="range-row">
+          <input type="range" id="breadInput" min="0" max="100" step="5" value="0">
+          <output id="breadOut">0%</output>
+        </div>
+      </div>
+
+      <div class="crit-item" style="--accent:#ef4444">
+        <div class="crit-head"><span class="dot"></span><span>الامتناع عن تناول السكر</span></div>
+        <div class="range-row">
+          <input type="range" id="sugarInput" min="0" max="100" step="5" value="0">
+          <output id="sugarOut">0%</output>
+        </div>
+      </div>
+
+      <div class="crit-item" style="--accent:#8b5cf6">
+        <div class="crit-head"><span class="dot"></span><span>الامتناع عن الإكثار في تناول الطعام</span></div>
+        <div class="range-row">
+          <input type="range" id="overInput" min="0" max="100" step="5" value="0">
+          <output id="overOut">0%</output>
+        </div>
+      </div>
+
+      <div class="crit-item" style="--accent:#0ea5e9">
+        <div class="crit-head"><span class="dot"></span><span>الالتزام بشرب كمية مناسبة من الماء</span></div>
+        <div class="range-row">
+          <input type="range" id="waterInput" min="0" max="100" step="5" value="0">
+          <output id="waterOut">0%</output>
+        </div>
+      </div>
+
+      <div class="crit-item wide" style="--accent:#0d9488">
+        <div class="crit-head"><span class="dot"></span><span>الالتزام بالمشي (بالدقائق)</span></div>
+        <div class="range-row">
+          <input type="range" id="walkInput" min="0" max="180" step="5" value="0">
+          <output id="walkOut">0 دقيقة</output>
+        </div>
+        <div class="target-box">
+          <span>الهدف اليومي للمشي:</span>
+          <input type="number" id="walkTargetInput" min="5" max="300" step="5" value="30">
+          <span>دقيقة</span>
+        </div>
+      </div>
+
+      <div class="crit-item wide" style="--accent:#ec4899">
+        <div class="crit-head"><span class="dot"></span><span>الصيام المتقطع (ساعات بدون طعام)</span></div>
+        <div class="range-row">
+          <input type="range" id="fastingInput" min="0" max="24" step="1" value="0">
+          <output id="fastingOut">0 ساعة</output>
+        </div>
+        <div class="target-box">
+          <span>الهدف اليومي للصيام:</span>
+          <input type="number" id="fastingTargetInput" min="8" max="24" step="1" value="16">
+          <span>ساعة</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="live-score">
+      <span>نسبة الالتزام لهذا اليوم (متوسط المعايير الستة)</span>
+      <strong id="liveScore">0%</strong>
+    </div>
+
+    <div class="actions">
+      <button class="btn-main" id="btnSave">💾 حفظ التسجيل</button>
+      <button class="btn-danger" id="btnDelete">🗑️ حذف تسجيل اليوم</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </section>
+
+  <!-- الرسم البياني -->
+  <section class="card">
+    <h2>📊 رسم بياني — آخر أسبوعين <small>(اضغط على اسم المعيار في المفتاح لإخفائه/إظهاره)</small></h2>
+    <div class="chart-box">
+      <canvas id="chart"></canvas>
+    </div>
+  </section>
+
+  <!-- التقرير -->
+  <section class="card">
+    <h2>📄 تقرير الالتزام</h2>
+
+    <div class="presets">
+      <button data-days="7">آخر 7 أيام</button>
+      <button data-days="14">آخر 14 يوم</button>
+      <button data-days="30">آخر 30 يوم</button>
+      <button data-days="month">هذا الشهر</button>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="fromInput">من تاريخ</label>
+        <input type="date" id="fromInput">
+      </div>
+      <div class="field">
+        <label for="toInput">إلى تاريخ</label>
+        <input type="date" id="toInput">
+      </div>
+    </div>
+
+    <div id="reportBody"></div>
+  </section>
+
+</div>
+
+<button id="installBtn" class="install-btn">📲 تثبيت التطبيق على الهاتف</button>
+
+<script>
+/* ============================================================
+   PWA — التثبيت والعمل بدون إنترنت
+   ============================================================ */
+(function setupPWA(){
+  const installBtn = document.getElementById('installBtn');
+  const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                     window.navigator.standalone === true;
+
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('✅ Service Worker جاهز'))
+        .catch(err => console.log('SW:', err.message));
+    });
+  }
+
+  let deferredPrompt = null;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (!standalone) installBtn.classList.add('show');
+  });
+
+  if (isIOS && !standalone){
+    setTimeout(() => installBtn.classList.add('show'), 800);
+  }
+
+  installBtn.addEventListener('click', async () => {
+    if (deferredPrompt){
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') installBtn.classList.remove('show');
+      deferredPrompt = null;
+    } else if (isIOS){
+      alert('لتثبيت التطبيق على الآيفون:\n\n1. اضغط زر المشاركة (المربع مع السهم ⬆️)\n2. اختر "إضافة إلى الشاشة الرئيسية"\n3. اضغط "إضافة"');
+    } else {
+      alert('لتثبيت التطبيق:\n\nافتح قائمة المتصفح (⋮)\nثم اختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية"');
+    }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    installBtn.classList.remove('show');
+  });
+})();
+
+/* ============================================================
+   التخزين المحلي
+   ============================================================ */
+const KEY  = 'dietTracker_v4'; // تحديث الإصدار لدعم معيار الصيام
+const SKEY = 'dietTracker_settings_v2';
+
+function norm(v){
+  if (v === true)  return 100;
+  if (v === false) return 0;
+  const n = Number(v);
+  return isNaN(n) ? 0 : Math.max(0, Math.min(100, n));
+}
+function mins(v){
+  const n = Number(v);
+  return isNaN(n) ? 0 : Math.max(0, Math.min(600, n));
+}
+function hours(v){
+  const n = Number(v);
+  return isNaN(n) ? 0 : Math.max(0, Math.min(24, n));
+}
+
+let data = {};
+try { data = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ data = {}; }
+
+// ترحيل البيانات القديمة
+if (!Object.keys(data).length){
+  try{
+    const old = JSON.parse(localStorage.getItem('dietTracker_v3')) || {};
+    Object.keys(old).forEach(k => {
+      const e = old[k] || {};
+      data[k] = {
+        bread:      norm(e.bread),
+        sugar:      norm(e.sugar),
+        overeating: norm(e.overeating),
+        water:      norm(e.water),
+        walk:       mins(e.walk),
+        fasting:    hours(e.fasting || 0) // إضافة القيمة الافتراضية
+      };
+    });
+  }catch(e){}
+}
+
+// تنظيف / توحيد شكل السجلات
+Object.keys(data).forEach(k => {
+  const e = data[k] || {};
+  data[k] = {
+    bread:      norm(e.bread),
+    sugar:      norm(e.sugar),
+    overeating: norm(e.overeating),
+    water:      norm(e.water),
+    walk:       mins(e.walk),
+    fasting:    hours(e.fasting)
+  };
+});
+
+let settings = { walkTarget: 30, fastingTarget: 16 };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY)) || {}); } catch(e){}
+settings.walkTarget    = Math.max(5, Math.min(300, Number(settings.walkTarget) || 30));
+settings.fastingTarget = Math.max(8, Math.min(24, Number(settings.fastingTarget) || 16));
+
+function persist(){ localStorage.setItem(KEY, JSON.stringify(data)); }
+function persistSettings(){ localStorage.setItem(SKEY, JSON.stringify(settings)); }
+
+/* ============================================================
+   أدوات التواريخ
+   ============================================================ */
+function keyOf(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function parseKey(k){ const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d); }
+function shortDate(k){ const d = parseKey(k); return `${d.getDate()}/${d.getMonth()+1}`; }
+function longDate(k){
+  const d = parseKey(k);
+  const days   = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+function todayKey(){ return keyOf(new Date()); }
+
+/* ============================================================
+   حساب النسب والالتزام
+   ============================================================ */
+function walkPct(e){
+  const target = Number(settings.walkTarget) || 30;
+  if (!e) return 0;
+  return Math.min(100, (mins(e.walk) / target) * 100);
+}
+function fastingPct(e){
+  const target = Number(settings.fastingTarget) || 16;
+  if (!e) return 0;
+  return Math.min(100, (hours(e.fasting) / target) * 100);
+}
+function dayScore(e){
+  if (!e) return null;
+  return (norm(e.bread) + norm(e.sugar) + norm(e.overeating) + norm(e.water) + walkPct(e) + fastingPct(e)) / 6;
+}
+
+/* ============================================================
+   عناصر الصفحة
+   ============================================================ */
+const dateInput        = document.getElementById('dateInput');
+const breadInput       = document.getElementById('breadInput');
+const sugarInput       = document.getElementById('sugarInput');
+const overInput        = document.getElementById('overInput');
+const waterInput       = document.getElementById('waterInput');
+const walkInput        = document.getElementById('walkInput');
+const walkTargetInput  = document.getElementById('walkTargetInput');
+const fastingInput     = document.getElementById('fastingInput');
+const fastingTargetInput = document.getElementById('fastingTargetInput');
+
+const breadOut = document.getElementById('breadOut');
+const sugarOut = document.getElementById('sugarOut');
+const overOut  = document.getElementById('overOut');
+const waterOut = document.getElementById('waterOut');
+const walkOut  = document.getElementById('walkOut');
+const fastingOut = document.getElementById('fastingOut');
+
+const liveScore = document.getElementById('liveScore');
+const formScore = document.getElementById('formScore');
+const btnSave   = document.getElementById('btnSave');
+const btnDelete = document.getElementById('btnDelete');
+const msg       = document.getElementById('msg');
+
+/* ============================================================
+   النتيجة الحية
+   ============================================================ */
+function currentWalkPct(){
+  const target = Number(walkTargetInput.value) || 30;
+  return Math.min(100, (Number(walkInput.value) / target) * 100);
+}
+function currentFastingPct(){
+  const target = Number(fastingTargetInput.value) || 16;
+  return Math.min(100, (Number(fastingInput.value) / target) * 100);
+}
+function currentScore(){
+  return (Number(breadInput.value) + Number(sugarInput.value) +
+          Number(overInput.value)  + Number(waterInput.value) +
+          currentWalkPct() + currentFastingPct()) / 6;
+}
+function updateLive(){
+  breadOut.textContent = breadInput.value + '%';
+  sugarOut.textContent = sugarInput.value + '%';
+  overOut.textContent  = overInput.value  + '%';
+  waterOut.textContent = waterInput.value + '%';
+
+  const wp = Math.round(currentWalkPct());
+  walkOut.textContent = `${walkInput.value} دقيقة · ${wp}%`;
+  
+  const fp = Math.round(currentFastingPct());
+  fastingOut.textContent = `${fastingInput.value} ساعة · ${fp}%`;
+
+  const sc = Math.round(currentScore());
+  liveScore.textContent = sc + '%';
+  formScore.textContent = sc + '%';
+  formScore.style.color = sc >= 75 ? '#15803d' : sc >= 50 ? '#b45309' : '#b91c1c';
+}
+
+[breadInput, sugarInput, overInput, waterInput, walkInput, fastingInput]
+  .forEach(el => el.addEventListener('input', updateLive));
+
+walkTargetInput.addEventListener('change', () => {
+  let v = Number(walkTargetInput.value);
+  if (!v || v < 5)   v = 5;
+  if (v > 300)       v = 300;
+  walkTargetInput.value = v;
+  settings.walkTarget = v;
+  persistSettings();
+  updateLive();
+  refreshAll();
+});
+
+fastingTargetInput.addEventListener('change', () => {
+  let v = Number(fastingTargetInput.value);
+  if (!v || v < 8)   v = 8;
+  if (v > 24)        v = 24;
+  fastingTargetInput.value = v;
+  settings.fastingTarget = v;
+  persistSettings();
+  updateLive();
+  refreshAll();
+});
+
+/* ============================================================
+   تحميل / حفظ / حذف تسجيل اليوم
+   ============================================================ */
+function loadEntry(){
+  const k = dateInput.value;
+  if (!k) return;
+  const e = data[k];
+
+  if (e){
+    breadInput.value = norm(e.bread);
+    sugarInput.value = norm(e.sugar);
+    overInput.value  = norm(e.overeating);
+    waterInput.value = norm(e.water);
+    walkInput.value  = Math.min(180, mins(e.walk));
+    fastingInput.value = Math.min(24, hours(e.fasting));
+    btnSave.textContent = '✏️ تحديث التسجيل';
+    btnDelete.style.display = 'inline-block';
+    msg.textContent = 'يوجد تسجيل محفوظ لهذا اليوم — يمكنك تعديله';
+    msg.className = 'msg warn';
+  } else {
+    breadInput.value = sugarInput.value = overInput.value = 0;
+    waterInput.value = walkInput.value = fastingInput.value = 0;
+    btnSave.textContent = '💾 حفظ التسجيل';
+    btnDelete.style.display = 'none';
+    msg.textContent = 'لا يوجد تسجيل لهذا اليوم';
+    msg.className = 'msg warn';
+  }
+  updateLive();
+}
+dateInput.addEventListener('change', loadEntry);
+
+btnSave.addEventListener('click', () => {
+  const k = dateInput.value;
+  if (!k){ alert('الرجاء اختيار التاريخ أولاً'); return; }
+
+  data[k] = {
+    bread:      Number(breadInput.value),
+    sugar:      Number(sugarInput.value),
+    overeating: Number(overInput.value),
+    water:      Number(waterInput.value),
+    walk:       Number(walkInput.value),
+    fasting:    Number(fastingInput.value)
+  };
+  persist();
+  msg.textContent = '✅ تم حفظ التسجيل بنجاح';
+  msg.className = 'msg';
+  btnSave.textContent = '✏️ تحديث التسجيل';
+  btnDelete.style.display = 'inline-block';
+  refreshAll();
+});
+
+btnDelete.addEventListener('click', () => {
+  const k = dateInput.value;
+  if (!k || !data[k]) return;
+  if (!confirm('هل تريد حذف تسجيل يوم ' + longDate(k) + ' ؟')) return;
+  delete data[k];
+  persist();
+  msg.textContent = '🗑️ تم حذف التسجيل';
+  msg.className = 'msg warn';
+  loadEntry();
+  refreshAll();
+});
+
+/* ============================================================
+   الرسم البياني
+   ============================================================ */
+let chartInstance = null;
+
+function renderChart(){
+  const canvas = document.getElementById('chart');
+  if (typeof Chart === 'undefined'){
+    canvas.parentElement.innerHTML =
+      '<div class="empty">تعذّر تحميل مكتبة الرسم البياني.<br>افتح التطبيق مرة واحدة مع الاتصال بالإنترنت لتحميلها، ثم سيعمل بدون إنترنت.</div>';
+    return;
+  }
+
+  const labels = [], total = [], bread = [], sugar = [],
+        over = [], water = [], walk = [], fasting = [];
+
+  for (let i = 13; i >= 0; i--){
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const k = keyOf(d);
+    labels.push(shortDate(k));
+    const e = data[k];
+    if (e){
+      bread.push(norm(e.bread));
+      sugar.push(norm(e.sugar));
+      over.push(norm(e.overeating));
+      water.push(norm(e.water));
+      walk.push(Math.round(walkPct(e)));
+      fasting.push(Math.round(fastingPct(e)));
+      total.push(Math.round(dayScore(e)));
+    } else {
+      bread.push(null); sugar.push(null); over.push(null);
+      water.push(null); walk.push(null); fasting.push(null); total.push(null);
+    }
+  }
+
+  const cfg = {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'الالتزام الكلي', data: total, borderColor:'#0284c7',
+          backgroundColor:'rgba(2,132,199,.12)', fill:true, borderWidth:3,
+          tension:.35, pointRadius:3, spanGaps:true },
+        { label:'الخبز', data: bread, borderColor:'#f59e0b',
+          borderWidth:2, tension:.2, pointRadius:2, spanGaps:true },
+        { label:'السكر', data: sugar, borderColor:'#ef4444',
+          borderWidth:2, tension:.2, pointRadius:2, spanGaps:true },
+        { label:'عدم الإكثار', data: over, borderColor:'#8b5cf6',
+          borderWidth:2, tension:.2, pointRadius:2, spanGaps:true },
+        { label:'الماء', data: water, borderColor:'#0ea5e9',
+          borderWidth:2, tension:.2, pointRadius:2, spanGaps:true },
+        { label:'المشي', data: walk, borderColor:'#0d9488',
+          borderWidth:2, borderDash:[6,4], tension:.2, pointRadius:2, spanGaps:true },
+        { label:'الصيام', data: fasting, borderColor:'#ec4899',
+          borderWidth:2, borderDash:[2,2], tension:.2, pointRadius:2, spanGaps:true }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { usePointStyle:true, boxWidth:9, padding:14,
+                    font:{ family:'Tahoma, Arial', size:12 } }
+        },
+        tooltip: {
+          titleFont:{ family:'Tahoma, Arial' },
+          bodyFont:{ family:'Tahoma, Arial' },
+          callbacks: {
+            label: c => {
+              const v = c.parsed.y;
+              if (v == null) return `${c.dataset.label}: لا يوجد تسجيل`;
+              if (c.dataset.label === 'المشي'){
+                const k = Object.keys(data).find(x => shortDate(x) === c.label);
+                const m = k ? mins(data[k].walk) : null;
+                return `المشي: ${Math.round(v)}%` + (m != null ? ` (${m} دقيقة)` : '');
+              }
+              if (c.dataset.label === 'الصيام'){
+                const k = Object.keys(data).find(x => shortDate(x) === c.label);
+                const h = k ? hours(data[k].fasting) : null;
+                return `الصيام: ${Math.round(v)}%` + (h != null ? ` (${h} ساعة)` : '');
+              }
+              return `${c.dataset.label}: ${Math.round(v)}%`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: { min:0, max:100,
+             ticks:{ callback:v => v + '%',
+                     font:{ family:'Tahoma, Arial', size:11 } } },
+        x: { ticks:{ maxRotation:0, autoSkip:true,
+                     font:{ family:'Tahoma, Arial', size:11 } } }
+      }
+    }
+  };
+
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(canvas, cfg);
+}
+
+/* ============================================================
+   التقرير
+   ============================================================ */
+const fromInput  = document.getElementById('fromInput');
+const toInput    = document.getElementById('toInput');
+const reportBody = document.getElementById('reportBody');
+
+function buildReport(){
+  const from = fromInput.value, to = toInput.value;
+
+  if (!from || !to || from > to){
+    reportBody.innerHTML = '<div class="empty">الرجاء اختيار مدة صحيحة (من تاريخ ≤ إلى تاريخ)</div>';
+    return;
+  }
+
+  const keys = Object.keys(data).filter(k => k >= from && k <= to).sort();
+  const totalDays = Math.round((parseKey(to) - parseKey(from)) / 86400000) + 1;
+
+  if (!keys.length){
+    reportBody.innerHTML = '<div class="empty">لا توجد تسجيلات في هذه المدة</div>';
+    return;
+  }
+
+  let sum = 0, b = 0, s = 0, o = 0, w = 0, wk = 0, wkPct = 0, fa = 0, faPct = 0;
+  let full = 0, high = 0, walkDays = 0, fastDays = 0;
+  let bestK = keys[0], worstK = keys[0];
+
+  keys.forEach(k => {
+    const e = data[k];
+    const sc = dayScore(e);
+    sum += sc;
+    b  += norm(e.bread);
+    s  += norm(e.sugar);
+    o  += norm(e.overeating);
+    w  += norm(e.water);
+    wk += mins(e.walk);
+    wkPct += walkPct(e);
+    fa += hours(e.fasting);
+    faPct += fastingPct(e);
+    if (mins(e.walk) > 0) walkDays++;
+    if (hours(e.fasting) > 0) fastDays++;
+    if (sc >= 100) full++;
+    if (sc >= 75)  high++;
+    if (sc > dayScore(data[bestK]))  bestK  = k;
+    if (sc < dayScore(data[worstK])) worstK = k;
+  });
+
+  const n = keys.length;
+  const avg    = sum / n;
+  const rBread = b / n;
+  const rSugar = s / n;
+  const rOver  = o / n;
+  const rWater = w / n;
+  const rWalkM = wk / n;
+  const rWalkP = wkPct / n;
+  const rFastH = fa / n;
+  const rFastP = faPct / n;
+
+  let rating, color, bg;
+  if (avg >= 85)      { rating = '🌟 ممتاز — استمر على هذا المستوى!';        color = '#15803d'; bg = '#dcfce7'; }
+  else if (avg >= 70) { rating = '👍 جيد جداً — قريب من الهدف';              color = '#0369a1'; bg = '#e0f2fe'; }
+  else if (avg >= 50) { rating = '🙂 جيد — يحتاج بعض التحسين';               color = '#b45309'; bg = '#fef3c7'; }
+  else                { rating = '⚠️ يحتاج تحسيناً — ابدأ بخطوات صغيرة';     color = '#b91c1c'; bg = '#fee2e2'; }
+
+  const pct = v => Math.round(v) + '%';
+  const targetW = Number(settings.walkTarget) || 30;
+  const targetF = Number(settings.fastingTarget) || 16;
+
+  let html = `
+    <div class="report-grid">
+      <div class="r-item"><div class="v">${n} / ${totalDays}</div><div class="l">أيام مسجّلة / أيام المدة</div></div>
+      <div class="r-item"><div class="v" style="color:#0284c7">${pct(avg)}</div><div class="l">متوسط الالتزام الكلي</div></div>
+      <div class="r-item"><div class="v" style="color:#f59e0b">${pct(rBread)}</div><div class="l">متوسط الامتناع عن الخبز</div></div>
+      <div class="r-item"><div class="v" style="color:#ef4444">${pct(rSugar)}</div><div class="l">متوسط الامتناع عن السكر</div></div>
+      <div class="r-item"><div class="v" style="color:#8b5cf6">${pct(rOver)}</div><div class="l">متوسط عدم الإكثار في الطعام</div></div>
+      <div class="r-item"><div class="v" style="color:#0ea5e9">${pct(rWater)}</div><div class="l">متوسط الالتزام بشرب الماء</div></div>
+      <div class="r-item"><div class="v" style="color:#0d9488">${Math.round(rWalkM)} دقيقة</div>
+        <div class="l">متوسط المشي (${pct(rWalkP)} من الهدف ${targetW} د)</div></div>
+      <div class="r-item"><div class="v" style="color:#ec4899">${rFastH.toFixed(1)} ساعة</div>
+        <div class="l">متوسط الصيام (${pct(rFastP)} من الهدف ${targetF} س)</div></div>
+      <div class="r-item"><div class="v">${walkDays}</div><div class="l">أيام مارست فيها المشي</div></div>
+      <div class="r-item"><div class="v">${fastDays}</div><div class="l">أيام مارست فيها الصيام</div></div>
+      <div class="r-item"><div class="v">${full}</div><div class="l">أيام التزام كامل (100%)</div></div>
+      <div class="r-item"><div class="v">${high}</div><div class="l">أيام التزام عالٍ (≥ 75%)</div></div>
+      <div class="r-item"><div class="v" style="font-size:14px">${shortDate(bestK)}</div>
+        <div class="l">أفضل يوم (${pct(dayScore(data[bestK]))})</div></div>
+      <div class="r-item"><div class="v" style="font-size:14px">${shortDate(worstK)}</div>
+        <div class="l">أضعف يوم (${pct(dayScore(data[worstK]))})</div></div>
+    </div>
+
+    <div class="rating" style="color:${color}; background:${bg}">${rating}</div>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>التاريخ</th>
+            <th>الخبز</th>
+            <th>السكر</th>
+            <th>عدم الإكثار</th>
+            <th>الماء</th>
+            <th>المشي</th>
+            <th>الصيام</th>
+            <th>الالتزام</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  keys.slice().reverse().forEach(k => {
+    const e = data[k];
+    const sc = dayScore(e);
+    const cell = v => `<span style="color:${v>=75?'#15803d':v>=50?'#b45309':'#b91c1c'};font-weight:700">${Math.round(v)}%</span>`;
+    const wp = walkPct(e);
+    const fp = fastingPct(e);
+    html += `
+      <tr>
+        <td>${shortDate(k)}</td>
+        <td>${cell(norm(e.bread))}</td>
+        <td>${cell(norm(e.sugar))}</td>
+        <td>${cell(norm(e.overeating))}</td>
+        <td>${cell(norm(e.water))}</td>
+        <td>${cell(wp)}<span class="sub">${mins(e.walk)} دقيقة</span></td>
+        <td>${cell(fp)}<span class="sub">${hours(e.fasting)} ساعة</span></td>
+        <td style="background:#f8fafc">${cell(sc)}</td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table></div>';
+  reportBody.innerHTML = html;
+}
+
+document.querySelectorAll('.presets button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.presets button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const to = new Date();
+    const from = new Date();
+    const v = btn.dataset.days;
+
+    if (v === 'month'){
+      from.setDate(1);
+    } else {
+      from.setDate(to.getDate() - (Number(v) - 1));
+    }
+    fromInput.value = keyOf(from);
+    toInput.value   = keyOf(to);
+    buildReport();
+  });
+});
+[fromInput, toInput].forEach(inp => inp.addEventListener('change', buildReport));
+
+/* ============================================================
+   الإحصائيات السريعة
+   ============================================================ */
+function refreshStats(){
+  const t = todayKey();
+  const todayEntry = data[t];
+
+  document.getElementById('statToday').textContent =
+    todayEntry ? Math.round(dayScore(todayEntry)) + '%' : '—';
+
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < 7; i++){
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const e = data[keyOf(d)];
+    if (e){ sum += dayScore(e); cnt++; }
+  }
+  document.getElementById('statWeek').textContent =
+    cnt ? Math.round(sum / cnt) + '%' : '—';
+
+  let streak = 0;
+  const start = new Date();
+  if (!data[keyOf(start)]) start.setDate(start.getDate() - 1);
+  for (let i = 0; i < 365; i++){
+    const e = data[keyOf(start)];
+    if (e && dayScore(e) >= 75){ streak++; start.setDate(start.getDate() - 1); }
+    else break;
+  }
+  document.getElementById('statStreak').textContent = streak;
+}
+
+function refreshAll(){
+  renderChart();
+  refreshStats();
+  buildReport();
+}
+
+/* ============================================================
+   التهيئة
+   ============================================================ */
+(function init(){
+  dateInput.value = todayKey();
+  walkTargetInput.value = settings.walkTarget;
+  fastingTargetInput.value = settings.fastingTarget;
+
+  const to = new Date(), from = new Date();
+  from.setDate(to.getDate() - 13);
+  fromInput.value = keyOf(from);
+  toInput.value   = keyOf(to);
+  document.querySelector('.presets button[data-days="14"]').classList.add('active');
+
+  loadEntry();
+  refreshAll();
+})();
+</script>
+</body>
+</html>
